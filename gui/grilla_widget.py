@@ -313,10 +313,10 @@ class GrillaWidget(QWidget):
             except Exception as e:
                 self.registrar_log(f"Error cargando configuración: {e}")
         
-        # MODIFICACIÓN: Inicializar GestorAlertas optimizado con umbral 0.50
+        # MODIFICACIÓN: Inicializar GestorAlertas optimizado
         self.alertas = GestorAlertas(cam_id=str(uuid.uuid4())[:8], filas=self.filas, columnas=self.columnas)
         
-        # Configurar el sistema optimizado de capturas con umbral 0.50
+        # Configurar el sistema optimizado de capturas
         if hasattr(self.alertas, 'configurar_capturas'):
             self.alertas.configurar_capturas(
                 confidence_threshold=0.50,  # Umbral recomendado
@@ -623,7 +623,7 @@ class GrillaWidget(QWidget):
                 self.finish_line_edit()
             return
         
-        pos = event.pos()
+        pos = event.position()
         cell_w = self.width() / self.columnas
         cell_h = self.height() / self.filas
 
@@ -728,6 +728,7 @@ class GrillaWidget(QWidget):
         self.request_paint_update()
 
     def handle_set_ptz_map(self):
+        """Asignar PTZ a celda - MEJORADO"""
         if not self.selected_cells:
             self.registrar_log("⚠️ No hay celdas seleccionadas para asignar PTZ")
             return
@@ -749,15 +750,22 @@ class GrillaWidget(QWidget):
             return
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("Asignar PTZ remoto")
-        dialog.setMinimumSize(350, 200)
+        dialog.setWindowTitle("📍 Asignar PTZ Remoto")
+        dialog.setMinimumSize(400, 280)
 
         layout = QVBoxLayout(dialog)
         
         # Información de las celdas seleccionadas
-        info_label = QLabel(f"Asignando PTZ para {len(self.selected_cells)} celda(s) seleccionada(s)")
-        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
+        info_label = QLabel(f"Configurando PTZ para {len(self.selected_cells)} celda(s) seleccionada(s)")
+        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px; color: #2E5BBA;")
         layout.addWidget(info_label)
+        
+        # Mostrar celdas seleccionadas
+        cells_text = ", ".join([f"({row},{col})" for row, col in sorted(self.selected_cells)])
+        cells_label = QLabel(f"Celdas: {cells_text}")
+        cells_label.setStyleSheet("color: gray; font-size: 11px; margin-bottom: 15px;")
+        cells_label.setWordWrap(True)
+        layout.addWidget(cells_label)
         
         layout.addWidget(QLabel("Cámara PTZ disponible:"))
         combo = QComboBox(dialog)
@@ -766,30 +774,41 @@ class GrillaWidget(QWidget):
         for ptz_ip in self.ptz_cameras:
             ptz_info = self._get_ptz_camera_info(ptz_ip)
             if ptz_info:
-                display_text = f"{ptz_ip} ({ptz_info.get('usuario', 'admin')}) - {ptz_info.get('tipo', 'ptz')}"
+                display_text = f"🎯 {ptz_ip} ({ptz_info.get('usuario', 'admin')})"
                 combo.addItem(display_text, ptz_ip)  # Usar ptz_ip como data
             else:
-                combo.addItem(ptz_ip, ptz_ip)
+                combo.addItem(f"🎯 {ptz_ip}", ptz_ip)
         
         layout.addWidget(combo)
 
         layout.addWidget(QLabel("Número de preset:"))
         preset_edit = QLineEdit(dialog)
         preset_edit.setPlaceholderText("Ej: 1, 2, 3...")
+        preset_edit.setToolTip("Introduce el número del preset (1-255)")
         layout.addWidget(preset_edit)
         
-        # Información adicional
+        # Información adicional mejorada
         help_label = QLabel(
-            "💡 Tip: El preset debe existir previamente en la cámara PTZ.\n"
-            "Puedes crear presets usando el menú PTZ > Seguimiento."
+            "💡 Información importante:\n"
+            "• El preset debe existir previamente en la cámara PTZ\n"
+            "• Puedes crear presets usando PTZ > Gestión Avanzada PTZ\n"
+            "• El número aparecerá en la esquina de la celda\n"
+            "• Celdas con PTZ se marcan en morado"
         )
-        help_label.setStyleSheet("color: gray; font-size: 11px; margin-top: 10px;")
+        help_label.setStyleSheet("color: #555; font-size: 11px; margin: 10px; padding: 8px; "
+                                "background-color: #f0f0f0; border-radius: 5px;")
+        help_label.setWordWrap(True)
         layout.addWidget(help_label)
 
         btn_layout = QHBoxLayout()
-        ok_btn = QPushButton("Aceptar")
-        cancel_btn = QPushButton("Cancelar")
+        ok_btn = QPushButton("✅ Asignar PTZ")
+        cancel_btn = QPushButton("❌ Cancelar")
         test_btn = QPushButton("🧪 Probar PTZ")  # Botón para probar la conexión
+        
+        # Mejorar estilo de botones
+        ok_btn.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; }")
+        cancel_btn.setStyleSheet("QPushButton { background-color: #f44336; color: white; }")
+        test_btn.setStyleSheet("QPushButton { background-color: #2196F3; color: white; }")
         
         btn_layout.addWidget(ok_btn)
         btn_layout.addWidget(cancel_btn)
@@ -803,10 +822,12 @@ class GrillaWidget(QWidget):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
-        ip = combo.currentData() or combo.currentText().split()[0]  # Usar data o extraer IP
+        ip = combo.currentData() or combo.currentText().split()[1]  # Extraer IP
         preset = preset_edit.text().strip()
         
         if not ip or not preset:
+            QMessageBox.warning(self, "Datos incompletos", 
+                               "❌ Debe especificar tanto la IP como el preset")
             self.registrar_log("❌ Debe especificar tanto la IP como el preset")
             return
 
@@ -817,7 +838,7 @@ class GrillaWidget(QWidget):
                 raise ValueError("Preset fuera de rango")
         except ValueError:
             QMessageBox.warning(self, "Preset inválido", 
-                               "El preset debe ser un número entre 1 y 255")
+                               "❌ El preset debe ser un número entre 1 y 255")
             return
 
         # Aplicar el mapeo a todas las celdas seleccionadas
@@ -829,7 +850,15 @@ class GrillaWidget(QWidget):
         self.selected_cells.clear()
         self.request_paint_update()
         
-        self.registrar_log(f"✅ PTZ asignado: {cells_count} celdas → {ip} preset {preset}")
+        # Log mejorado
+        cells_list = ", ".join([f"({row},{col})" for row, col in sorted(self.cell_ptz_map.keys()) 
+                               if self.cell_ptz_map[(row, col)]["ip"] == ip and 
+                               self.cell_ptz_map[(row, col)]["preset"] == preset])
+        
+        self.registrar_log(f"✅ PTZ asignado exitosamente:")
+        self.registrar_log(f"   📍 Celdas: {cells_list}")
+        self.registrar_log(f"   🎯 PTZ: {ip} → Preset {preset}")
+        self.registrar_log(f"   📊 Total configurado: {cells_count} celdas")
 
     def _reload_ptz_cameras(self):
         """Recarga la lista de cámaras PTZ desde la configuración"""
@@ -912,15 +941,29 @@ class GrillaWidget(QWidget):
             )
 
     def handle_clear_ptz_map(self):
+        """Elimina mapeo PTZ de las celdas seleccionadas - MEJORADO"""
         if not self.selected_cells:
             return
 
+        removed_count = 0
+        removed_info = []
+        
         for cell in list(self.selected_cells):
             if cell in self.cell_ptz_map:
+                ptz_info = self.cell_ptz_map[cell]
+                removed_info.append(f"({cell[0]},{cell[1]}) → {ptz_info['ip']} P{ptz_info['preset']}")
                 del self.cell_ptz_map[cell]
+                removed_count += 1
 
-        self._save_cell_ptz_map_to_config()
-        self.request_paint_update()
+        if removed_count > 0:
+            self._save_cell_ptz_map_to_config()
+            self.request_paint_update()
+            
+            self.registrar_log(f"🗑️ PTZ eliminado de {removed_count} celdas:")
+            for info in removed_info:
+                self.registrar_log(f"   - {info}")
+        else:
+            self.registrar_log("⚠️ Las celdas seleccionadas no tenían mapeo PTZ")
 
     def mouseMoveEvent(self, event):
         if self.cross_line_edit_mode and self._dragging_line:
@@ -1145,6 +1188,7 @@ class GrillaWidget(QWidget):
             self.registrar_log(f"❌ Error moviendo PTZ {ip} a preset {preset}: {e}")
 
     def paintEvent(self, event):
+        """Método paintEvent corregido"""
         super().paintEvent(event) 
         qp = QPainter(self)
         
@@ -1196,12 +1240,36 @@ class GrillaWidget(QWidget):
                 if brush_color is not None:
                     rect_to_draw = QRectF(col * cell_w, row * cell_h, cell_w, cell_h)
                     qp.fillRect(rect_to_draw, brush_color)
+                
+                # Mostrar preset local (P + número)
                 if (row, col) in self.cell_presets:
                     qp.setPen(QColor("white"))
-                    qp.drawText(QPointF(col * cell_w + 2, row * cell_h + 12), f"P{self.cell_presets[(row, col)]}")
+                    preset_text = f"P{self.cell_presets[(row, col)]}"
+                    qp.drawText(QPointF(col * cell_w + 2, row * cell_h + 12), preset_text)
+                
+                # Mostrar preset PTZ remoto (número del preset)
                 if (row, col) in self.cell_ptz_map:
+                    ptz_info = self.cell_ptz_map[(row, col)]
+                    preset_num = ptz_info.get("preset", "?")
+                    
                     qp.setPen(QColor("yellow"))
-                    qp.drawText(QPointF(col * cell_w + 2, row * cell_h + 24), "T")
+                    font = qp.font()
+                    font.setPointSize(8)
+                    qp.setFont(font)
+                    
+                    preset_text = str(preset_num)
+                    text_rect = qp.fontMetrics().boundingRect(preset_text)
+                    text_width = text_rect.width()
+                    
+                    qp.drawText(
+                        QPointF(col * cell_w + cell_w - text_width - 2, row * cell_h + 10), 
+                        preset_text
+                    )
+                    
+                    # Restaurar fuente original
+                    font.setPointSize(10)
+                    qp.setFont(font)
+
         # Dibujar líneas de la grilla
         if self._grid_lines_pixmap:
             qp.drawPixmap(self.rect(), self._grid_lines_pixmap)
