@@ -1,33 +1,6 @@
 {
     "camaras": [
         {
-            "ip": "19.10.10.132",
-            "usuario": "root",
-            "contrasena": "@Remoto753524",
-            "tipo": "fija",
-            "rtsp": "rtsp://root:%40Remoto753524@19.10.10.132:554/media/video2",
-            "modelo": "Personas",
-            "modelos": [
-                "Personas"
-            ],
-            "confianza": 0.25,
-            "intervalo": 60,
-            "imgsz": 640,
-            "device": "cuda",
-            "resolucion": "sub",
-            "umbral": 0.5,
-            "guardar_capturas": true,
-            "modo_centinela": false,
-            "lost_ttl": 5,
-            "fps_config": {
-                "visual_fps": 25,
-                "detection_fps": 8,
-                "ui_update_fps": 15,
-                "adaptive_fps": true
-            },
-            "cell_ptz_map": {}
-        },
-        {
             "ip": "19.10.10.217",
             "usuario": "root",
             "contrasena": "@Remoto753524",
@@ -80,10 +53,7 @@
             "umbral": 0.5,
             "guardar_capturas": false,
             "modo_centinela": false,
-            "cell_presets": {
-                "13_6": "1",
-                "13_7": "1"
-            },
+            "cell_presets": {},
             "cell_ptz_map": {
                 "14_6": {
                     "ip": "19.10.10.217",
@@ -114,22 +84,6 @@
                     "preset": "1"
                 },
                 "15_0": {
-                    "ip": "19.10.10.217",
-                    "preset": "1"
-                },
-                "10_1": {
-                    "ip": "19.10.10.217",
-                    "preset": "1"
-                },
-                "9_2": {
-                    "ip": "19.10.10.217",
-                    "preset": "1"
-                },
-                "9_1": {
-                    "ip": "19.10.10.217",
-                    "preset": "1"
-                },
-                "10_2": {
                     "ip": "19.10.10.217",
                     "preset": "1"
                 },
@@ -245,21 +199,13 @@
                     "ip": "19.10.10.217",
                     "preset": "10"
                 },
-                "11_3": {
-                    "ip": "19.10.10.217",
-                    "preset": "13"
-                },
-                "11_4": {
-                    "ip": "19.10.10.217",
-                    "preset": "13"
-                },
                 "11_2": {
                     "ip": "19.10.10.217",
-                    "preset": "14"
+                    "preset": "13"
                 },
                 "11_1": {
                     "ip": "19.10.10.217",
-                    "preset": "13"
+                    "preset": "14"
                 },
                 "11_0": {
                     "ip": "19.10.10.217",
@@ -284,6 +230,34 @@
                 "9_15": {
                     "ip": "19.10.10.217",
                     "preset": "3"
+                },
+                "10_20": {
+                    "ip": "19.10.10.217",
+                    "preset": "5"
+                },
+                "10_21": {
+                    "ip": "19.10.10.217",
+                    "preset": "5"
+                },
+                "11_20": {
+                    "ip": "19.10.10.217",
+                    "preset": "6"
+                },
+                "11_21": {
+                    "ip": "19.10.10.217",
+                    "preset": "6"
+                },
+                "9_12": {
+                    "ip": "19.10.10.217",
+                    "preset": "1"
+                },
+                "11_3": {
+                    "ip": "19.10.10.217",
+                    "preset": "12"
+                },
+                "11_4": {
+                    "ip": "19.10.10.217",
+                    "preset": "12"
                 }
             },
             "discarded_grid_cells": []
