@@ -1,4 +1,4 @@
-# ui/ptz_preset_dialog.py
+# ui/ptz_preset_dialog.py - CORREGIDO
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QComboBox, 
     QLabel, QSpinBox, QLineEdit, QTextEdit, QGroupBox, QMessageBox, QListWidget,
@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 import json
 import os
-from datetime import datetime
+from datetime import datetime  # CORRECCIÓN: Importar solo datetime, no todo el módulo
 
 # Importaciones seguras
 try:
@@ -19,18 +19,23 @@ except ImportError:
     print("⚠️ Módulo PTZ mejorado no disponible, usando funcionalidad básica")
 
 class PTZPresetDialog(QDialog):
-    """Diálogo avanzado para gestión de presets PTZ"""
+    """Diálogo avanzado para gestión de presets PTZ - VERSIÓN CORREGIDA"""
     
     preset_updated = pyqtSignal(int, str)  # preset_number, preset_name
     
-    def __init__(self, parent=None, camera_data=None, ptz_camera=None):
+    def __init__(self, parent=None, camera_list=None, ptz_camera=None):
         super().__init__(parent)
         self.setWindowTitle("🎯 Gestión Avanzada de Presets PTZ")
         self.setMinimumSize(600, 500)
         
-        self.camera_data = camera_data or {}
+        # CORRECCIÓN: Usar camera_list en lugar de camera_data
+        self.camera_list = camera_list or []
         self.ptz_camera = ptz_camera
         self.presets_data = {}
+        self.current_camera_data = None
+        
+        # Seleccionar primera cámara PTZ si hay alguna
+        self._select_first_ptz_camera()
         
         # Inicializar sistema PTZ si está disponible
         if ENHANCED_AVAILABLE:
@@ -50,6 +55,17 @@ class PTZPresetDialog(QDialog):
         
         # Verificar conexión inicial
         QTimer.singleShot(1000, self._check_initial_connection)
+        
+    def _select_first_ptz_camera(self):
+        """Selecciona la primera cámara PTZ disponible"""
+        for camera in self.camera_list:
+            if camera.get('tipo') == 'ptz':
+                self.current_camera_data = camera
+                self._log(f"📷 Cámara PTZ seleccionada: {camera.get('ip')}")
+                break
+        
+        if not self.current_camera_data:
+            self._log("⚠️ No se encontraron cámaras PTZ en la lista")
         
     def _setup_ui(self):
         """Configura la interfaz de usuario"""
@@ -82,9 +98,12 @@ class PTZPresetDialog(QDialog):
         info_group = QGroupBox("📷 Información de la Cámara")
         info_layout = QHBoxLayout()
         
-        ip = self.camera_data.get("ip", "N/A")
-        tipo = self.camera_data.get("tipo", "N/A")
-        usuario = self.camera_data.get("usuario", "N/A")
+        if self.current_camera_data:
+            ip = self.current_camera_data.get("ip", "N/A")
+            tipo = self.current_camera_data.get("tipo", "N/A")
+            usuario = self.current_camera_data.get("usuario", "N/A")
+        else:
+            ip = tipo = usuario = "N/A"
         
         info_label = QLabel(f"IP: {ip} | Tipo: {tipo} | Usuario: {usuario}")
         info_label.setStyleSheet("font-weight: bold; color: #2E5BBA;")
@@ -362,14 +381,19 @@ class PTZPresetDialog(QDialog):
     def _load_presets(self):
         """Carga los presets desde archivo local"""
         try:
-            presets_file = f"presets_{self.camera_data.get('ip', 'unknown')}.json"
-            if os.path.exists(presets_file):
-                with open(presets_file, 'r') as f:
-                    self.presets_data = json.load(f)
-                self._log(f"✅ Presets cargados desde {presets_file}")
+            if self.current_camera_data:
+                ip = self.current_camera_data.get('ip', 'unknown')
+                presets_file = f"presets_{ip}.json"
+                if os.path.exists(presets_file):
+                    with open(presets_file, 'r') as f:
+                        self.presets_data = json.load(f)
+                    self._log(f"✅ Presets cargados desde {presets_file}")
+                else:
+                    self.presets_data = {}
+                    self._log("ℹ️ No se encontró archivo de presets, iniciando con lista vacía")
             else:
                 self.presets_data = {}
-                self._log("ℹ️ No se encontró archivo de presets, iniciando con lista vacía")
+                self._log("⚠️ Sin cámara seleccionada, no se pueden cargar presets")
                 
             self.refresh_presets_list()
             
@@ -440,8 +464,8 @@ class PTZPresetDialog(QDialog):
             # Guardar información localmente
             self.presets_data[str(preset_num)] = {
                 "name": preset_name,
-                "created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "camera_ip": self.camera_data.get("ip")
+                "created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # CORRECCIÓN: datetime está correctamente importado
+                "camera_ip": self.current_camera_data.get("ip") if self.current_camera_data else "unknown"
             }
             
             self._save_presets_to_file()
@@ -645,8 +669,8 @@ class PTZPresetDialog(QDialog):
             "connection_timeout": self.connection_timeout_spin.value(),
             "retry_attempts": self.retry_attempts_spin.value(),
             "default_speed": self.speed_slider.value(),
-            "camera_ip": self.camera_data.get("ip"),
-            "saved_at": datetime.now().isoformat()
+            "camera_ip": self.current_camera_data.get("ip") if self.current_camera_data else "unknown",
+            "saved_at": datetime.now().isoformat()  # CORRECCIÓN: datetime correctamente usado
         }
         
         # Agregar información del sistema si está disponible
@@ -654,7 +678,12 @@ class PTZPresetDialog(QDialog):
             config["system_info"] = self.system_info
         
         try:
-            config_file = f"ptz_config_{self.camera_data.get('ip', 'unknown').replace('.', '_')}.json"
+            if self.current_camera_data:
+                ip = self.current_camera_data.get('ip', 'unknown').replace('.', '_')
+                config_file = f"ptz_config_{ip}.json"
+            else:
+                config_file = "ptz_config_unknown.json"
+                
             with open(config_file, 'w') as f:
                 json.dump(config, f, indent=4)
             self._log(f"✅ Configuración guardada en {config_file}")
@@ -680,19 +709,34 @@ class PTZPresetDialog(QDialog):
     def _save_presets_to_file(self):
         """Guarda los presets al archivo local"""
         try:
-            presets_file = f"presets_{self.camera_data.get('ip', 'unknown')}.json"
+            if self.current_camera_data:
+                ip = self.current_camera_data.get('ip', 'unknown')
+                presets_file = f"presets_{ip}.json"
+            else:
+                presets_file = "presets_unknown.json"
+                
             with open(presets_file, 'w') as f:
                 json.dump(self.presets_data, f, indent=4)
+                
         except Exception as e:
             self._log(f"❌ Error guardando presets: {e}")
             
     def _log(self, message):
         """Agrega un mensaje al área de logs"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        timestamp = datetime.now().strftime("%H:%M:%S")  # CORRECCIÓN: datetime correctamente usado
         formatted_message = f"[{timestamp}] {message}"
-        self.log_area.append(formatted_message)
         
-        # Desplazar al final
-        cursor = self.log_area.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        self.log_area.setTextCursor(cursor)
+        # Si log_area no existe aún, imprimir en consola
+        if not hasattr(self, 'log_area') or self.log_area is None:
+            print(f"PTZ Preset Log: {formatted_message}")
+            return
+            
+        try:
+            self.log_area.append(formatted_message)
+            
+            # Desplazar al final
+            cursor = self.log_area.textCursor()
+            cursor.movePosition(cursor.MoveOperation.End)
+            self.log_area.setTextCursor(cursor)
+        except Exception as e:
+            print(f"Error en _log: {e} - Mensaje: {formatted_message}")
