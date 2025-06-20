@@ -47,19 +47,26 @@ class PTZTrackingDialog(QDialog):
             self._show_module_error()
             return
 
-        # CORRECCIÓN: Cargar TODAS las cámaras, no solo PTZ
+        # CORRECCIÓN: Inicializar variables antes de usar _log
         self.all_cameras = camera_list or []
         self.ptz_cameras = []
         self.credentials_cache = {}
-        
-        # Cargar configuración y detectar cámaras PTZ
-        self._load_camera_configuration()
-
         self.ptz_objects = {}
         self.current_camera_data = None
+        
+        # Buffer temporal para logs antes de que se cree la UI
+        self._log_buffer = []
 
+        # CORRECCIÓN: Configurar UI ANTES de cargar configuración
         self._setup_ui()
         self._connect_signals()
+        
+        # Ahora cargar configuración (puede usar _log sin problemas)
+        self._load_camera_configuration()
+        
+        # Aplicar logs buffereados
+        self._flush_log_buffer()
+        
         self._update_ui_state()
         
         # Seleccionar primera cámara por defecto
@@ -98,7 +105,7 @@ class PTZTrackingDialog(QDialog):
         camera_layout = QVBoxLayout()
         
         self.selector = QComboBox()
-        self._populate_camera_selector()
+        # NOTA: _populate_camera_selector se llamará después de cargar la configuración
         self.selector.currentIndexChanged.connect(self._on_camera_changed)
         
         camera_layout.addWidget(QLabel("Seleccionar cámara para control PTZ:"))
@@ -201,7 +208,7 @@ class PTZTrackingDialog(QDialog):
         tracking_group.setLayout(tracking_layout)
         layout.addWidget(tracking_group)
 
-        # Área de logs
+        # Área de logs - CRÍTICO: Crear esto ANTES de llamar _log
         log_group = QGroupBox("📋 Registro de Actividad")
         log_layout = QVBoxLayout()
         
@@ -252,11 +259,16 @@ class PTZTrackingDialog(QDialog):
                             self.ptz_cameras.append(ip)
                             
                 self._log(f"✅ Configuración cargada: {len(self.credentials_cache)} cámaras, {len(self.ptz_cameras)} PTZ")
+                
+                # Ahora que tenemos la configuración, poblar el selector
+                self._populate_camera_selector()
             else:
                 self._log("⚠️ Archivo config.json no encontrado")
+                self._populate_camera_selector()  # Poblar con lista vacía
                 
         except Exception as e:
             self._log(f"❌ Error cargando configuración: {e}")
+            self._populate_camera_selector()  # Poblar con lista vacía
 
     def _populate_camera_selector(self):
         """Puebla el selector de cámaras con información detallada"""
@@ -281,6 +293,14 @@ class PTZTrackingDialog(QDialog):
             
             display_text = f"{ptz_indicator} {ip} ({usuario}) {creds_indicator}"
             self.selector.addItem(display_text, cam)  # Guardar datos de la cámara
+
+    def _flush_log_buffer(self):
+        """Aplica los logs que estaban en el buffer temporal"""
+        if hasattr(self, '_log_buffer') and self._log_buffer:
+            for message in self._log_buffer:
+                if hasattr(self, 'log_area'):
+                    self.log_area.append(message)
+            self._log_buffer.clear()
 
     def _on_camera_changed(self, index):
         """Maneja el cambio de cámara seleccionada"""
@@ -643,13 +663,27 @@ class PTZTrackingDialog(QDialog):
             self._log(f"❌ Error de conexión a {ip}: {e}")
 
     def _log(self, message):
-        """Agrega un mensaje al área de logs"""
+        """Agrega un mensaje al área de logs - VERSIÓN CORREGIDA"""
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
         formatted_message = f"[{timestamp}] {message}"
-        self.log_area.append(formatted_message)
         
-        # Desplazar al final
-        cursor = self.log_area.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        self.log_area.setTextCursor(cursor)
+        # Si log_area no existe aún, guardar en buffer temporal
+        if not hasattr(self, 'log_area') or self.log_area is None:
+            if not hasattr(self, '_log_buffer'):
+                self._log_buffer = []
+            self._log_buffer.append(formatted_message)
+            print(f"PTZ Log (buffered): {formatted_message}")  # También imprimir en consola
+            return
+        
+        # Si log_area existe, agregar el mensaje
+        try:
+            self.log_area.append(formatted_message)
+            
+            # Desplazar al final
+            cursor = self.log_area.textCursor()
+            cursor.movePosition(cursor.MoveOperation.End)
+            self.log_area.setTextCursor(cursor)
+        except Exception as e:
+            print(f"Error agregando mensaje al log: {e}")
+            print(f"Mensaje original: {formatted_message}")
